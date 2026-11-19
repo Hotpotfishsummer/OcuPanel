@@ -21,16 +21,3 @@
 - [眼科 VLM、GraphRAG 和多 Agent 研究](research/ophthalmology-vlm-graphrag-multiagent-research.md)记录调研时的外部方案和评估设想。
 
 功能变更时同步维护对应模块的 README。历史方案中的外部模型能力、性能估计与时间表以其原始记录为准。
-
-## 引用
-
-```bibtex
-@inproceedings{liu2025medchat,
-  title     = {{MedChat}: A Multi-Agent Framework for Multimodal Diagnosis with Large Language Models},
-  author    = {Liu, Philip R. and Bansal, Sparsh and Dinh, Jimmy and Pawar, Aditya and Satishkumar, Ramani and Desai, Shail and Gupta, Neeraj and Wang, Xin and Hu, Shu},
-  booktitle = {2025 IEEE 8th International Conference on Multimedia Information Processing and Retrieval (MIPR)},
-  year      = {2025},
-  pages     = {456--462},
-  doi       = {10.1109/MIPR67560.2025.00078}
-}
-```

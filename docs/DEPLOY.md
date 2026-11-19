@@ -79,7 +79,7 @@ EOF
 chmod 600 ~/.ssh/config
 
 ssh -T git@github.com          # 应显示 successfully authenticated
-git clone git@github.com:tpTwof/OcuPanel.git .
+git clone git@github.com:Hotpotfishsummer/OcuPanel.git .
 ```
 
 克隆完成后目录应是 `/opt/ocupanel/backend`、`/opt/ocupanel/frontend`、`/opt/ocupanel/tools`。

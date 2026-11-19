@@ -13,7 +13,7 @@ OcuPanel 是一个基于 React 和 FastAPI 的眼科问答与眼底影像分析�
 1. 克隆仓库并进入项目目录。
 
    ```powershell
-   git clone https://github.com/tpTwof/OcuPanel.git
+   git clone https://github.com/Hotpotfishsummer/OcuPanel.git
    Set-Location OcuPanel
    ```
 
@@ -89,18 +89,8 @@ OcuPanel 是一个基于 React 和 FastAPI 的眼科问答与眼底影像分析�
    ```
 
 4. 使用 `git add` 暂存本次变更，然后执行 `git commit -m "docs: update project guide"`。
-5. 执行 `git push -u origin feature/your-change`，向上游 `main` 提交 Pull Request。
+5. 执行 `git push -u origin feature/your-change`，提交 Pull Request。
 
 ## 许可证
 
-本项目采用 MIT 许可证。[LICENSE](LICENSE) 保留了上游 M2-Lab@Purdue 的版权声明。
-
-## 上游项目与致谢
-
-OcuPanel 最初 fork 自 Purdue M2 Lab 的 MedChat。青光眼报告沿用了上游的六个专科角色（眼科医生、验光师、青光眼专科医生、全科医生、眼科技师和药师）以及由 Director 汇总专科意见的设计。OcuPanel 在此基础上加入了多用户账户、SQLite 持久化、证据检索和引用校验。感谢 MedChat 作者及贡献者公开原始实现。 [上游仓库](https://github.com/Purdue-M2/MedChat) · [原始论文](https://doi.org/10.1109/MIPR67560.2025.00078) · [BibTeX](docs/README.md#引用)
-
-## 联系方式
-
-- 邮箱 <tptwo06@gmail.com>
-- GitHub [@tpTwof](https://github.com/tpTwof)
-- 问题反馈 [OcuPanel Issues](https://github.com/tpTwof/OcuPanel/issues)
+本项目采用 MIT 许可证，详见 [LICENSE](LICENSE)。
