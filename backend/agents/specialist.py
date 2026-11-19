@@ -54,7 +54,10 @@ class SpecialistAgent:
                 text = decision.get('text')
                 if not isinstance(text,str) or not text.strip():
                     raise ValueError('Empty agent analysis')
-                tools.validate_citations(text)
+                # 引用编号写错（例如引用了已被裁掉的条目）不能在这里中断整条流水线：
+                # 一旦抛异常，六路并发整体失败，用户拿到 500 而不是报告。
+                # 编号问题由 CitationVerifier 的 unknown_citation_issues 确定性识别并修订，
+                # 与 Director 草稿同一套处理原则。
                 return text
             if step == self.max_tool_steps:
                 raise RuntimeError(f'Agent {self.name} exceeded tool budget')

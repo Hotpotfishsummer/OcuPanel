@@ -24,8 +24,8 @@ from report.utils.jobs import cleanup_job_dir, new_job_dir
 
 
 async def _load_generator(user: User) -> MedicalReportGenerator:
-    """取当前用户自己的 LLM 配置。没配就直接告诉用户去配，而不是甩一个 500。"""
-    cfg = await run_in_threadpool(storage.load_llm_config, user["id"])
+    """取当前用户自己的 LLM 配置；没配过就用服务器默认；两者都没有才报错。"""
+    cfg = await run_in_threadpool(storage.effective_llm_config, user["id"])
     if not cfg:
         raise ApplicationError(
             status_code=409,

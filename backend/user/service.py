@@ -20,6 +20,7 @@ from utils import storage
 
 # 预设几个常见端点，前端下拉直接选，省得用户手打
 PRESETS = [
+    {"label": "本机网关", "base_url": "http://127.0.0.1:3425/v1", "models": ["remote-magpie/minimax-cn/MiniMax-M3.1-Flash"]},
     {"label": "DeepSeek", "base_url": "https://api.deepseek.com", "models": ["deepseek-chat", "deepseek-flash"]},
     {"label": "OpenAI", "base_url": "https://api.openai.com/v1", "models": ["gpt-4.1", "gpt-4o-mini"]},
     {"label": "Moonshot", "base_url": "https://api.moonshot.cn/v1", "models": ["moonshot-v1-8k"]},
@@ -28,7 +29,7 @@ PRESETS = [
 
 
 def _payload(user: User) -> dict[str, Any]:
-    return {"user": user, "token": auth.issue_token(user["id"])}
+    return {"user": user, "token": auth.issue_token(user["id"]), "demo": config.DEMO_AUTO_LOGIN}
 
 
 async def register(body: RegisterRequest) -> dict[str, Any]:
@@ -54,9 +55,30 @@ async def logout(token: str) -> dict[str, Any]:
     return {"ok": True}
 
 
+async def demo_login() -> dict[str, Any]:
+    """演示模式自动登录：保证演示账号存在，直接把会话发出去。
+
+    这条接口不校验密码 —— 它的用途就是让前端跳过登录页。所以它只在
+    DEMO_AUTO_LOGIN 开启时挂载，且服务应当只监听回环/内网地址。
+    """
+    if not config.DEMO_AUTO_LOGIN:
+        raise ApplicationError(status_code=404, detail="未开启演示自动登录")
+
+    user = await run_in_threadpool(
+        storage.ensure_user,
+        config.DEMO_USERNAME,
+        config.DEMO_PASSWORD,
+        config.DEMO_DISPLAY_NAME,
+    )
+    return _payload(user)
+
+
 async def me(user: User) -> dict[str, Any]:
+    # 用户没配过就回落到服务器默认，前端据此决定要不要提示"去配置"
     cfg = await run_in_threadpool(storage.llm_config_public, user["id"])
-    return {"user": user, "llm": cfg}
+    if not cfg:
+        cfg = await run_in_threadpool(storage.server_llm_public)
+    return {"user": user, "llm": cfg, "demo": config.DEMO_AUTO_LOGIN}
 
 
 async def llm_presets() -> dict[str, Any]:

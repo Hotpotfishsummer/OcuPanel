@@ -27,11 +27,13 @@ class VerificationTests(unittest.TestCase):
         self.assertTrue(record['regenerated'])
         regenerate.assert_called_once()
 
-    def test_unresolved_rejected(self):
+    def test_unresolved_delivers_with_warning(self):
+        # 校验不再阻断交付：修订不收敛时交回正文并标 partial，让流程跑完。
         llm=Mock(side_effect=[json.dumps(self.issue),'{"replacements":[]}',json.dumps(self.issue)])
         text,record=CitationVerifier(llm).execute('Bad claim.',self.evidence,max_rounds=1)
-        self.assertIsNone(text)
-        self.assertEqual(record['status'],'rejected')
+        self.assertEqual(text,'Bad claim.')
+        self.assertEqual(record['status'],'partial')
+        self.assertEqual(len(record['remaining_issues']),1)
 
     def test_text_tools(self):
         self.assertEqual(locate('A B\nC','ABC'),(0,5))

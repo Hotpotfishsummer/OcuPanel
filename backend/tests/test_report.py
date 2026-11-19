@@ -35,14 +35,16 @@ class ReportTests(unittest.TestCase):
             self.assertTrue(any('not assessed' in prompt for prompt,_ in calls))
             self.assertEqual(generator.messages,[generator.system_prompt])
 
-    def test_verifier_rejects_missing_evidence_and_invalid_response(self):
+    def test_verifier_delivers_when_evidence_or_response_unusable(self):
+        # 没有证据包、或校验返回无法解析，都不再吞掉正文，只标注未核实。
         agent = CitationVerifier(lambda *a,**k:'{}')
         text, result = agent.execute('Draft',[])
-        self.assertIsNone(text)
+        self.assertEqual(text,'Draft')
+        self.assertEqual(result['status'],'partial')
         self.assertEqual(result['reason'],'no_evidence')
         text, result = agent.execute('Draft',[{'index':1,'text':'Evidence'}])
-        self.assertIsNone(text)
-        self.assertEqual(result['status'],'error')
+        self.assertEqual(text,'Draft')
+        self.assertEqual(result['status'],'partial')
 
     def test_specialist_failure_is_not_a_report(self):
         agent = SpecialistAgent('Eye', lambda *a,**k:'Error: timeout', lambda *a,**k:[])

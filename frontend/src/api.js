@@ -116,6 +116,13 @@ export const login = (username, password) =>
 export const logout = () =>
   callApi({ name: '登出', url: `${API_BASE_URL}/api/account/logout`, init: { method: 'POST' }, read: json })
 
+/**
+ * 演示模式自动登录：后端保证演示账号存在，直接换回一个会话。
+ * 未开启演示模式时后端回 404，调用方据此回落到登录页。
+ */
+export const demoLogin = () =>
+  callApi({ name: '演示自动登录', url: `${API_BASE_URL}/api/account/demo-login`, init: { method: 'POST' }, read: json })
+
 export const fetchMe = () => callApi({ name: '当前用户', url: `${API_BASE_URL}/api/account/me`, read: json })
 
 export const fetchLlmPresets = () =>

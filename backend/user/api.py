@@ -18,6 +18,11 @@ async def login(body: LoginRequest) -> dict[str, Any]:
 async def logout(token: str=Depends(auth.raw_token)) -> dict[str, Any]:
     return await service.logout(token)
 
+@account_router.post('/account/demo-login')
+async def demo_login() -> dict[str, Any]:
+    """演示模式的自动登录入口；未开启时返回 404，前端据此回落到登录页。"""
+    return await service.demo_login()
+
 @account_router.get('/account/me')
 async def me(user: auth.CurrentUser) -> dict[str, Any]:
     return await service.me(user)

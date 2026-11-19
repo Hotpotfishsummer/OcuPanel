@@ -11,9 +11,10 @@ import VerificationResult from './VerificationResult.jsx'
  */
 const REPORT_STAGES = [
   { at: 0, text: '影像分析：分割视盘与视杯，计算杯盘比' },
-  { at: 8, text: '证据检索：BM25 + 多语言向量，RRF 融合' },
-  { at: 20, text: '六专科并发会诊，Director 综合成文' },
-  { at: 45, text: '引用校验：逐句核对 [n] 出处，不合格会重写' }
+  { at: 12, text: '证据检索：BM25 + 多语言向量，RRF 融合' },
+  { at: 25, text: '六专科并发会诊' },
+  { at: 55, text: 'Director 综合成文' },
+  { at: 95, text: '引用校验：逐句核对 [n] 出处，不合格会重写' }
 ]
 
 function ReportPending({ startedAt }) {
@@ -51,7 +52,8 @@ function ReportPending({ startedAt }) {
       </ol>
 
       <div className="report-pending-hint">
-        通常需要 30–90 秒，完成后报告会直接出现在这里，可以继续追问细节。
+        通常需要 1–3 分钟，完成后报告会直接出现在这里，可以继续追问细节。
+        校验未完全通过时也会交付，并标注哪些结论需要人工复核。
       </div>
     </div>
   )

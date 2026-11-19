@@ -8,6 +8,29 @@ BASE_DIR = Path(__file__).resolve().parents[1]
 # 显式指向 backend/.env：不依赖进程工作目录，从任何目录启动都能读到配置
 load_dotenv(BASE_DIR / ".env")
 
+
+def _sanitize_no_proxy_env() -> None:
+    """剥掉 NO_PROXY / no_proxy 里带括号的 IPv6 条目两侧的括号。
+
+    httpx 0.28 的 get_environment_proxies() 会把裸 IPv6(::1)正确转成
+    'all://[::1]',但带括号的条目([::1])会落到通配分支生成
+    'all://*[::1]' 这种非法挂载键 —— 构造 httpx.Client(openai SDK
+    底层即此)时直接抛 InvalidURL: Invalid port,LLM 客户端根本无法创建。
+    剥掉括号后裸 ::1 会被 httpx 正确识别,本地网关的请求照常直连。
+    """
+    for var in ("NO_PROXY", "no_proxy"):
+        raw = os.getenv(var)
+        if not raw:
+            continue
+        cleaned = ",".join(
+            entry.strip().strip("[]") if entry.strip().startswith("[") else entry.strip()
+            for entry in raw.split(",")
+        )
+        os.environ[var] = cleaned
+
+
+_sanitize_no_proxy_env()
+
 # 服务监听
 HOST = os.getenv("HOST", "127.0.0.1")
 PORT = int(os.getenv("PORT", "8000"))
@@ -26,11 +49,49 @@ REPORT_LANGUAGE = (os.getenv("REPORT_LANGUAGE") or "zh").strip().lower()
 # 中文字体文件路径。留空则自动在系统字体目录里找（Windows 一般命中 simhei.ttf）。
 REPORT_FONT_PATH = os.getenv("REPORT_FONT_PATH") or None
 
+
+def default_llm() -> dict[str, str | None] | None:
+    """服务器默认 LLM：用户没在「个人设置」里配过时用它。
+
+    只要 env 里给了端点或 key 就算"配了默认"，用户层配置永远优先。
+    本地网关通常不校验 key，但 openai SDK 不接受空字符串，所以这里补一个
+    占位值 —— 它只会被原样塞进 Authorization 头，不会去任何鉴权服务验证。
+    """
+    if not (OPENAI_BASE_URL or OPENAI_API_KEY):
+        return None
+    return {
+        "api_key": OPENAI_API_KEY or "no-key",
+        "base_url": OPENAI_BASE_URL,
+        "model": OPENAI_MODEL,
+    }
+
+# 演示模式：默认自动登录一个测试账号，前端不再渲染登录/注册页，直接进主界面。
+# 打开后 /api/account/demo-login 会把演示账号的会话直接发给任何能访问本服务的人，
+# 所以只在 127.0.0.1 / 内网演示环境开启，不要放到公网。设 DEMO_AUTO_LOGIN=0 关闭。
+DEMO_AUTO_LOGIN = (os.getenv("DEMO_AUTO_LOGIN", "1") != "0")
+DEMO_USERNAME = (os.getenv("DEMO_USERNAME") or "demo").strip() or "demo"
+DEMO_PASSWORD = os.getenv("DEMO_PASSWORD") or "Demo12345"
+DEMO_DISPLAY_NAME = (os.getenv("DEMO_DISPLAY_NAME") or "演示账号").strip() or "演示账号"
+
 # 单次 LLM 调用超时（秒）与重试次数。不设上限时一个卡住的请求能拖死整条链路。
 LLM_TIMEOUT = float(os.getenv("LLM_TIMEOUT", "120"))
 LLM_MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "1"))
+# 单次调用的硬性上限（秒）。传输层 timeout 遇到「网关还在慢慢吐字节」时
+# 会不断重置，实测能把一次调用拖到 280s；这里用看门狗直接把等待截断。
+LLM_CALL_TIMEOUT = float(os.getenv("LLM_CALL_TIMEOUT", "90"))
+# 整条报告流水线的总预算（秒）。超出后跳过引用校验，直接交付 Director 草稿，
+# 保证用户不会对着进度条无限等待。0 表示不限制。
+REPORT_DEADLINE = float(os.getenv("REPORT_DEADLINE", "210"))
 # 关闭 DeepSeek 的 thinking 模式以显著提速（1=关闭，默认关闭 thinking）
 LLM_DISABLE_THINKING = (os.getenv("LLM_DISABLE_THINKING", "1") != "0")
+# 推理型模型的推理强度（low / medium / high ...，留空则不传）。
+# MiniMax、DeepSeek-R1 这类模型默认会花大量 token 在隐藏思考上：实测同一段
+# 专科提示词，默认强度单次 116 秒，low 只要 2-8 秒。报告流水线一次要串行
+# 调用十几次，不降强度就会几分钟不出结果。非推理端点通常会忽略该参数。
+LLM_REASONING_EFFORT = (os.getenv("LLM_REASONING_EFFORT") or "").strip().lower()
+# 单次生成的最大输出 token 数。不设上限时模型可能长时间生成，
+# 拖垮整条报告流水线；专科报告与大综合都在 4k token 以内。
+LLM_MAX_OUTPUT_TOKENS = int(os.getenv("LLM_MAX_OUTPUT_TOKENS", "4096"))
 
 # 聊天上下文：数据库保留全量记录，只有发给模型的消息受这些预算限制。
 CHAT_HISTORY_MAX_MESSAGES = int(os.getenv("CHAT_HISTORY_MAX_MESSAGES", "20"))
@@ -82,6 +143,9 @@ RAG_MAX_PER_SOURCE = int(os.getenv("RAG_MAX_PER_SOURCE", "2"))
 VERIFY_ENABLED = (os.getenv("VERIFY_ENABLED", "1") != "0")
 # 打回重写的轮数上限。每轮 = 核查 + 重写，最坏每轮 2 次 LLM 调用。
 VERIFY_MAX_ROUNDS = int(os.getenv("VERIFY_MAX_ROUNDS", "2"))
+# 修订不收敛时是否再让 Director 整篇重生成一次。重生成要额外两次长调用，
+# 实测常常只是换一套说法把问题带回来；默认交付当前正文并标注即可。
+VERIFY_REGENERATE = (os.getenv("VERIFY_REGENERATE", "1") != "0")
 # 正文被删到低于此字数（或原稿的 40%，取较大者）判定为「不成文」，
 # 触发整篇重新生成；重生成后仍不合格就拒答，不输出报告。
 VERIFY_MIN_CHARS = int(os.getenv("VERIFY_MIN_CHARS", "300"))

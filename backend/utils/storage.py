@@ -291,6 +291,42 @@ def authenticate(username: str, password: str) -> dict | None:
     return {"id": row["id"], "username": row["username"], "display_name": row["display_name"]}
 
 
+def ensure_user(username: str, password: str, display_name: str = "") -> dict:
+    """幂等创建账号：不存在就建，已存在直接返回，绝不覆盖已有密码。
+
+    演示模式下每次启动都会调它，所以不能因为"已存在"就抛错，
+    也不能顺手把密码重置成配置值 —— 那样等于给了一个后门。
+    """
+    existing = authenticate(username, password)
+    if existing:
+        return existing
+
+    # 密码对不上或不存在的两种情况分开处理：前者说明用户名被正常注册占用过
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT id, username, display_name FROM users WHERE username = ?",
+            ((username or "").strip(),),
+        ).fetchone()
+    if row:
+        return dict(row)
+
+    try:
+        return create_user(username, password, display_name)
+    except ValueError:
+        # 并发启动时可能被另一个请求抢先插入，再查一次即可
+        again = authenticate(username, password)
+        if again:
+            return again
+        with connect() as conn:
+            row = conn.execute(
+                "SELECT id, username, display_name FROM users WHERE username = ?",
+                ((username or "").strip(),),
+            ).fetchone()
+        if row:
+            return dict(row)
+        raise
+
+
 def get_user(user_id: str) -> dict | None:
     with connect() as conn:
         row = conn.execute(
@@ -357,6 +393,38 @@ def llm_config_public(user_id: str) -> dict | None:
 def delete_llm_config(user_id: str) -> None:
     with connect() as conn:
         conn.execute("DELETE FROM llm_configs WHERE user_id = ?", (user_id,))
+
+
+def effective_llm_config(user_id: str) -> dict | None:
+    """实际用于发起调用的配置：用户自己的优先，没配就回落到服务器默认。
+
+    和 load_llm_config 的区别就在这里 —— 那个只反映"用户在界面上填过什么"，
+    这个才是调用方该用的。两者分开，是为了让「个人设置」能如实显示
+    "未配置 / 正在用服务器默认"，不会把默认值伪装成用户自己填的。
+    """
+    cfg = load_llm_config(user_id)
+    if cfg:
+        return {**cfg, "source": "user"}
+
+    fallback = config.default_llm()
+    if fallback:
+        return {**fallback, "source": "server"}
+    return None
+
+
+def server_llm_public() -> dict | None:
+    """服务器默认配置的对外可见版本（给「个人设置」用）。"""
+    fallback = config.default_llm()
+    if not fallback:
+        return None
+    return {
+        "has_key": True,
+        "api_key_masked": "服务器默认（无需 Key）",
+        "base_url": fallback["base_url"],
+        "model": fallback["model"],
+        "updated_at": None,
+        "source": "server",
+    }
 
 
 # ---------------------------------------------------------------------------

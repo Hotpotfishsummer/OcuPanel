@@ -52,8 +52,24 @@ class MedicalReportGenerator(LLMClient, PDFRenderer):
         roles: list[str] | tuple[str, ...],
         job_dir: Path,
     ) -> ReportResult:
+        import time
+        started = time.time()
         reports, ratio, path, evidence = self.generate_reports(image, note, roles, job_dir)
         summary = self.generate_synthesis(reports, evidence)
+        # 总预算到点就不再进校验：校验本身还要 3 次长调用，
+        # 继续等只会把「慢」变成「卡死」。直接交付草稿并标注未核实。
+        budget = config.REPORT_DEADLINE
+        if budget and budget > 0 and (time.time() - started) > budget:
+            print(
+                f"[REPORT] 已用 {time.time()-started:.0f}s，超出总预算 {budget:.0f}s，"
+                "跳过引用校验直接交付草稿",
+                file=sys.stderr, flush=True,
+            )
+            return ReportResult(
+                summary,
+                {"status": "partial", "reason": "deadline_exceeded", "rounds": 0},
+                ratio, path, evidence,
+            )
         summary, verification = self.verify_synthesis(
             summary, evidence,
             lambda issues: self.generate_synthesis(reports, evidence, avoid=issues),
@@ -162,14 +178,14 @@ class MedicalReportGenerator(LLMClient, PDFRenderer):
         调用方必须据此走拒答路径，不能把原文返回给用户。
         """
         if not config.VERIFY_ENABLED:
-            from agents.tools.evidence import unknown_citation_issues
+            # 校验关闭：不阻断交付，但要摘掉对不上任何证据的 [n]，
+            # 避免伪造编号进入报告。
+            from agents.tools.evidence import strip_unknown_citations, unknown_citation_issues
             issues = unknown_citation_issues(text, evidence)
-            if issues:
-                return None, {
-                    "status": "rejected", "reason": "unknown_citations",
-                    "remaining_issues": issues,
-                }
-            return text, {"status": "disabled"}
+            return strip_unknown_citations(text, evidence), {
+                "status": "disabled",
+                "remaining_issues": issues,
+            }
         if not text or text.startswith("Error:"):
             return None, {"status": "rejected", "reason": "empty_text"}
 
@@ -187,8 +203,9 @@ class MedicalReportGenerator(LLMClient, PDFRenderer):
             )
             return verifier.execute(
                 text, evidence, max_rounds=config.VERIFY_MAX_ROUNDS,
-                regenerate=regenerate,
+                regenerate=regenerate if config.VERIFY_REGENERATE else None,
             )
-        except Exception as exc:  # noqa: BLE001 - 校验崩了也不许把未校验的稿子放出去
-            print(f"[VERIFY] 校验链路异常，本次不输出报告：{exc}", file=sys.stderr)
-            return None, {"status": "error", "reason": str(exc)[:200]}
+        except Exception as exc:  # noqa: BLE001
+            # 校验链路自身崩了不该连累正文：交付并标注未核实，让流程跑完。
+            print(f"[VERIFY] 校验链路异常，交付正文并标注未核实：{exc}", file=sys.stderr)
+            return text, {"status": "partial", "reason": str(exc)[:200]}

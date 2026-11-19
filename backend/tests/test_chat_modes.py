@@ -59,7 +59,7 @@ class ConversationModeStorageTests(unittest.TestCase):
 class ChatModeServiceTests(unittest.IsolatedAsyncioTestCase):
     async def test_mode_controls_only_system_prompt(self):
         for mode in ('general','ophthalmic'):
-            with self.subTest(mode=mode), patch('chat.service.storage.get_conversation',return_value={'title':'Case','mode':mode}), patch('chat.service.storage.load_llm_config',return_value={'api_key':'test','model':'test','base_url':''}), patch('chat.service.storage.list_messages',return_value=[{'role':'user','content':'Analyze this'}, {'role':'assistant','content':'Saved report'}]), patch('chat.service.storage.add_message',return_value={'id':'m'}), patch('chat.service.LLMClient') as client:
+            with self.subTest(mode=mode), patch('chat.service.storage.get_conversation',return_value={'title':'Case','mode':mode}), patch('chat.service.storage.effective_llm_config',return_value={'api_key':'test','model':'test','base_url':''}), patch('chat.service.storage.list_messages',return_value=[{'role':'user','content':'Analyze this'}, {'role':'assistant','content':'Saved report'}]), patch('chat.service.storage.add_message',return_value={'id':'m'}), patch('chat.service.LLMClient') as client:
                 client.return_value.chat_with_history.return_value='Reply'
                 result = await service.send_message({'id':'u'},'c',SendMessageRequest(message='Question'))
                 self.assertEqual(result['reply'],'Reply')

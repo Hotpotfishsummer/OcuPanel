@@ -13,6 +13,7 @@ import { useState } from 'react'
 const STATUS = {
   pass: { tone: 'ok', label: '引用校验通过', hint: '所有引用均能被参考资料支持' },
   rewritten: { tone: 'ok', label: '已修正', hint: '无依据的句子已删除或改写' },
+  partial: { tone: 'warn', label: '已交付，部分结论未核实', hint: '仍有断言未被资料支持，已在下方列出，请人工复核' },
   rejected: { tone: 'bad', label: '校验未通过，报告已中止', hint: '存在无法被资料支持的结论，未生成报告' },
   error: { tone: 'bad', label: '校验故障，报告已中止', hint: '无法确认内容可靠性，未生成报告' },
   disabled: { tone: 'muted', label: '校验已关闭', hint: 'VERIFY_ENABLED=0，内容未经核查' },
@@ -31,7 +32,7 @@ export default function VerificationResult({ data }) {
   const deleted = data.deleted || 0
   const total = fixed.length + remaining.length
   const expandable = total > 0
-  const forceOpen = data.status === 'rejected' || data.status === 'error'
+  const forceOpen = data.status === 'rejected' || data.status === 'error' || data.status === 'partial'
   const shown = open || forceOpen
 
   return (

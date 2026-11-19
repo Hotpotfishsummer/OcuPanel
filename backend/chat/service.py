@@ -78,7 +78,7 @@ async def send_message(
     if not text:
         raise ApplicationError(status_code=400, detail="消息不能为空")
 
-    cfg = await run_in_threadpool(storage.load_llm_config, user["id"])
+    cfg = await run_in_threadpool(storage.effective_llm_config, user["id"])
     if not cfg:
         raise ApplicationError(status_code=409, detail="尚未配置 LLM API，请先在「个人设置」中填写")
 

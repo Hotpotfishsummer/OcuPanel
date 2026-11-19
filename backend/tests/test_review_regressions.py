@@ -28,10 +28,11 @@ class ReviewRegressionTests(unittest.TestCase):
         self.assertEqual(final, 'Draft [1]')
         self.assertEqual(report['status'], 'rewritten')
 
-    def test_invalid_citation_cannot_pass_even_if_llm_misses_it(self):
+    def test_invalid_citation_is_stripped_before_delivery(self):
+        # 交付不等于放行伪造编号：正文照发，[99] 这类对不上证据的记号必须被摘掉。
         final, report = CitationVerifier(lambda *a, **k: '{"claims":[]}').execute('Draft [99]', self.evidence, max_rounds=0)
-        self.assertIsNone(final)
-        self.assertEqual(report['status'], 'rejected')
+        self.assertEqual(report['status'], 'partial')
+        self.assertNotIn('[99]', final or '')
 
 class ConfigurationRegressionTests(unittest.TestCase):
     def test_removed_visual_backend_is_rejected(self):
@@ -47,15 +48,15 @@ class ConfigurationRegressionTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("ANALYSIS_PIPELINE was removed", result.stderr)
 
-    def test_unknown_citation_rejected_when_llm_verification_disabled(self):
+    def test_unknown_citation_stripped_when_llm_verification_disabled(self):
         from unittest.mock import patch
         from report.generation import MedicalReportGenerator
         with patch('utils.config.VERIFY_ENABLED', False):
             final, record = MedicalReportGenerator(api_key='test').verify_synthesis(
                 'Draft [99]', ReviewRegressionTests.evidence,
             )
-        self.assertIsNone(final)
-        self.assertEqual(record['reason'], 'unknown_citations')
+        self.assertNotIn('[99]', final or '')
+        self.assertEqual(record['status'], 'disabled')
 
 if __name__ == '__main__':
     unittest.main()

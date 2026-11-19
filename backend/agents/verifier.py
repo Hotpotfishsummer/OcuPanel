@@ -15,7 +15,7 @@ from .prompts.verification import (
     build_rewrite_prompt,
 )
 from .tools.json_response import parse_json
-from .tools.evidence import unknown_citation_issues
+from .tools.evidence import strip_unknown_citations, unknown_citation_issues
 from .tools.text_revision import apply_replacements, content_len
 
 MAX_ISSUES_PER_ROUND = 12
@@ -139,10 +139,11 @@ class CitationVerifier:
             report["reason"] = "empty_text"
             return None, report
         if not evidence:
-            # 没有证据包就无法校验，返回拒答，不能把未校验正文当作成功结果
+            # 没有证据包就无法逐条校验。这里选择「交付并标注」，而不是让整条
+            # 流程白跑一趟：正文仍然可用，只是未被外部资料核实。
             report["reason"] = "no_evidence"
-            report["status"] = "rejected"
-            return None, report
+            report["status"] = "partial"
+            return text, report
 
         ev_text = "\n".join(item.get("text", "") for item in evidence)
         ev_map = {
@@ -154,9 +155,11 @@ class CitationVerifier:
         issues = self.verify(text, evidence)
         report["rounds"] = 1
         if issues is None:
-            report["status"] = "error"
+            # 校验调用本身失败（超时/限流/JSON 坏掉）不是正文的错，
+            # 不能因此吞掉整份报告；交付原稿并标注「未核实」。
+            report["status"] = "partial"
             report["reason"] = "verify_call_failed"
-            return None, report
+            return text, report
 
         report["initial_issues"] = len(issues)
         if not issues:
@@ -183,9 +186,9 @@ class CitationVerifier:
             issues = self.verify(current, evidence)
             report["rounds"] = round_no + 1
             if issues is None:
-                report["status"] = "error"
+                report["status"] = "partial"
                 report["reason"] = "recheck_call_failed"
-                return None, report
+                return current, report
             if not issues:
                 break
 
@@ -205,9 +208,9 @@ class CitationVerifier:
                     issues = self.verify(current, evidence)
                     report["rounds"] += 1
                     if issues is None:
-                        report["status"] = "error"
+                        report["status"] = "partial"
                         report["reason"] = "recheck_call_failed"
-                        return None, report
+                        return current, report
                     if not issues:
                         break
                 else:
@@ -224,10 +227,18 @@ class CitationVerifier:
             return current, report
 
         report["remaining_issues"] = issues
-        report["status"] = "rejected"
         report["reason"] = "unverified_claims_remain"
+        # 修订可能把正文删得过短（尤其是全是无依据断言时）。此时宁可交回
+        # Director 原稿：完整但标注未核实，也好过一份被删空的报告。
+        delivered = current
+        if content_len(current) < min_len and content_len(text) > content_len(current):
+            delivered = text
+            report["fell_back_to_original"] = True
+        report["status"] = "partial"
+        # 交付不等于放行伪造编号：记号对不上任何证据的一律摘掉，句子保留。
+        delivered = strip_unknown_citations(delivered, evidence)
         print(
-            f"[VERIFY] 拒答：仍有 {len(issues)} 处断言无法被资料支持，不输出报告",
+            f"[VERIFY] 仍有 {len(issues)} 处断言无法被资料支持，交付正文并标注未核实",
             file=sys.stderr,
         )
-        return None, report
+        return delivered, report

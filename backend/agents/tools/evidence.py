@@ -56,3 +56,15 @@ def unknown_citation_issues(
                 "reason": f"Unknown citation numbers: {sorted(unknown)}",
             })
     return issues
+
+
+def strip_unknown_citations(text: str, evidence: list[dict[str, object]]) -> str:
+    """删除正文中不对应任何证据条目的 [n] 标记。
+
+    校验关闭时不能整份报告作废，但也不能让伪造编号进入输出，
+    折中办法是只摘掉编号、保留句子。
+    """
+    allowed = {int(item.get("index", i)) for i, item in enumerate(evidence, 1)}
+    def repl(m: re.Match) -> str:
+        return m.group(0) if int(m.group(1)) in allowed else ""
+    return re.sub(r"\[(\d+)\]", repl, text)

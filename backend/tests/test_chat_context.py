@@ -50,7 +50,7 @@ class ContextWindowTests(unittest.TestCase):
 
 class ContextRejectionTests(unittest.IsolatedAsyncioTestCase):
     async def test_oversized_question_is_not_saved_or_sent(self):
-        with patch('chat.service.storage.get_conversation',return_value={'mode':'general','title':'Case'}), patch('chat.service.storage.load_llm_config',return_value={'api_key':'x','model':'x','base_url':''}), patch('chat.service.storage.list_messages',return_value=[]), patch('chat.service.storage.add_message') as save, patch('chat.service.LLMClient') as client, patch('utils.config.CHAT_CONTEXT_MAX_CHARS',5):
+        with patch('chat.service.storage.get_conversation',return_value={'mode':'general','title':'Case'}), patch('chat.service.storage.effective_llm_config',return_value={'api_key':'x','model':'x','base_url':''}), patch('chat.service.storage.list_messages',return_value=[]), patch('chat.service.storage.add_message') as save, patch('chat.service.LLMClient') as client, patch('utils.config.CHAT_CONTEXT_MAX_CHARS',5):
             with self.assertRaises(ApplicationError) as caught:
                 await service.send_message({'id':'u'},'c',SendMessageRequest(message='x'*10))
             self.assertEqual(caught.exception.status_code,413)

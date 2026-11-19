@@ -108,23 +108,25 @@ export default function Sidebar({
           </span>
           <span className="nav-user-name">{user.display_name || user.username}</span>
         </button>
-        <button
-          type="button"
-          className="nav-user-logout"
-          onClick={onLogout}
-          title="退出登录"
-          aria-label="退出登录"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path
-              d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 8l-4 4 4 4M6 12h9"
-              stroke="currentColor"
-              strokeWidth="1.7"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
+        {onLogout && (
+          <button
+            type="button"
+            className="nav-user-logout"
+            onClick={onLogout}
+            title="退出登录"
+            aria-label="退出登录"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path
+                d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 8l-4 4 4 4M6 12h9"
+                stroke="currentColor"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+        )}
       </div>
     </aside>
   )

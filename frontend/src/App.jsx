@@ -11,6 +11,7 @@ import {
   changeConversationMode,
   createConversation,
   deleteConversation,
+  demoLogin,
   downloadReportPdf,
   fetchMe,
   generateReportContent,
@@ -37,6 +38,9 @@ export default function App() {
   const [booting, setBooting] = useState(true)
   const [user, setUser] = useState(null)
   const [llm, setLlm] = useState(null)
+  // 演示自动登录是否生效（由后端决定，前端只读）。为 true 时不渲染登录/注册页，
+  // 也不显示任何登出入口 —— 清了登录态也会被立刻自动重登，露出来只会让人困惑。
+  const [demoMode, setDemoMode] = useState(false)
 
   const [conversations, setConversations] = useState([])
   const [activeId, setActiveId] = useState(null)
@@ -51,7 +55,8 @@ export default function App() {
   const imageUrlsRef = useRef({})
   imageUrlsRef.current = imageUrls
 
-  const resetToLogin = () => {
+  /** 只清本地会话状态，不做任何跳转决策。 */
+  const clearSession = () => {
     setToken('')
     setUser(null)
     setLlm(null)
@@ -62,31 +67,89 @@ export default function App() {
     setView('welcome')
   }
 
+  /**
+   * 演示模式下静默重登。
+   * token 过期（401）在演示模式里不该弹登录页：那会让"直接进主界面"破功，
+   * 而且演示账号的密码本来就不是给使用者记的。重登失败才回落到登录页。
+   */
+  const reauthDemo = useCallback(async () => {
+    try {
+      const data = await demoLogin()
+      setToken(data.token)
+      setUser(data.user)
+      setDemoMode(Boolean(data.demo))
+      try {
+        const me = await fetchMe()
+        setLlm(me.llm)
+      } catch {
+        /* 已登录，llm 拿不到不影响主流程 */
+      }
+      return true
+    } catch {
+      // 后端把演示模式关了，或者服务不可达 —— 只能回落到登录页
+      setDemoMode(false)
+      clearSession()
+      return false
+    }
+  }, [])
+
   const guard = useCallback(
     (err) => {
-      if (err instanceof AuthError) {
-        resetToLogin()
-        return true
+      if (!(err instanceof AuthError)) return false
+      if (demoMode) {
+        reauthDemo()
+      } else {
+        clearSession()
       }
-      return false
+      return true
     },
-    []
+    [demoMode, reauthDemo]
   )
 
-  // 启动：有 token 就试着恢复登录态
+  // 启动：有 token 就恢复登录态；没有（或失效）就走演示自动登录，失败才落到登录页
   useEffect(() => {
-    const token = getToken()
-    if (!token) {
-      setBooting(false)
-      return
-    }
-    fetchMe()
-      .then((data) => {
+    let cancelled = false
+
+    const boot = async () => {
+      const token = getToken()
+      if (token) {
+        try {
+          const data = await fetchMe()
+          if (cancelled) return
+          setUser(data.user)
+          setLlm(data.llm)
+          setDemoMode(Boolean(data.demo))
+          return
+        } catch {
+          setToken('')
+        }
+      }
+
+      try {
+        const data = await demoLogin()
+        if (cancelled) return
+        setToken(data.token)
         setUser(data.user)
-        setLlm(data.llm)
-      })
-      .catch(() => setToken(''))
-      .finally(() => setBooting(false))
+        setDemoMode(Boolean(data.demo))
+        try {
+          const me = await fetchMe()
+          if (!cancelled) setLlm(me.llm)
+        } catch {
+          /* 已登录，llm 拿不到不影响主流程 */
+        }
+      } catch {
+        // 后端没开演示模式（404）或不可达：保持 demoMode=false，正常显示登录页
+        if (!cancelled) setDemoMode(false)
+      }
+    }
+
+    boot().finally(() => {
+      if (!cancelled) setBooting(false)
+    })
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const refreshConversations = useCallback(async () => {
@@ -113,6 +176,7 @@ export default function App() {
   const onAuthed = async (data) => {
     setToken(data.token)
     setUser(data.user)
+    setDemoMode(Boolean(data.demo))
     setView('welcome')
     try {
       const me = await fetchMe()
@@ -361,13 +425,16 @@ export default function App() {
   }
 
   const handleLogout = async () => {
+    // 演示模式下不存在"退出"：清了登录态下一步就被自动重登，按钮已经隐藏，
+    // 这里再兜一层，避免误触后短暂闪一下登录页。
+    if (demoMode) return
     if (!confirm('退出登录？对话与报告已保存在服务端，重新登录后仍在。')) return
     try {
       await apiLogout()
     } catch {
       /* token 可能已过期，忽略——本地照样要清掉 */
     }
-    resetToLogin()
+    clearSession()
   }
 
   if (booting) {
@@ -396,7 +463,7 @@ export default function App() {
         onSelectConversation={openConversation}
         onDeleteConversation={handleDeleteConversation}
         onOpenSettings={() => setView('settings')}
-        onLogout={handleLogout}
+        onLogout={demoMode ? null : handleLogout}
       />
 
       <main className="app-main">
@@ -434,7 +501,7 @@ export default function App() {
             llm={llm}
             onSaved={(saved) => setLlm(saved)}
             onClose={() => setView(activeId ? 'chat' : 'welcome')}
-            onLogout={handleLogout}
+            onLogout={demoMode ? null : handleLogout}
           />
         )}
       </main>
