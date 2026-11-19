@@ -881,17 +881,148 @@ button:disabled {
   margin-top: 10px;
 }
 
-/* 分割图单独占一行：和 chip 挤在同一行会被垂直居中，图上下一大片空白 */
-.msg-report-image {
-  flex: 0 0 100%;
+/* 从数据库读回的报告可能既没图也没下载入口，别留一条空白间距 */
+.msg-report-meta:empty {
+  display: none;
 }
 
-.ai-image {
+/* 分割图单独占一行：和 chip 挤在同一行会被垂直居中，图上下一大片空白 */
+/* ---------------- 报告顶部的杯盘分割图示 ---------------- */
+
+.report-figure {
+  margin: 0 0 16px;
+}
+
+.report-figure-btn {
+  position: relative;
   display: block;
-  max-width: 260px;
+  width: 100%;
+  max-width: 420px;
+  padding: 0;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 12px;
+  overflow: hidden;
   background: #fff;
+  cursor: zoom-in;
+}
+
+.report-figure-img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.report-figure-zoom {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.62);
+  color: #fff;
+  font-size: 11px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.report-figure-btn:hover .report-figure-zoom,
+.report-figure-btn:focus-visible .report-figure-zoom {
+  opacity: 1;
+}
+
+.report-figure-caption {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 7px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.report-figure-note {
+  margin-left: 6px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--bg-soft);
+  color: var(--text-3);
+  font-size: 11px;
+  font-style: normal;
+  cursor: help;
+}
+
+.report-figure-cdr strong {
+  margin-left: 2px;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.report-figure-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.report-figure-legend i {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  margin-left: 6px;
+}
+
+.report-figure-legend i:first-child {
+  margin-left: 0;
+}
+
+.legend-cup {
+  background: #22c55e;
+}
+
+.legend-disc {
+  background: #ec4899;
+}
+
+.image-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(2, 6, 23, 0.84);
+  cursor: zoom-out;
+}
+
+.image-lightbox img {
+  max-width: min(92vw, 920px);
+  max-height: 88vh;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.image-lightbox-close {
+  position: absolute;
+  top: 18px;
+  right: 20px;
+  padding: 6px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.image-lightbox-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+@media (max-width: 640px) {
+  .report-figure-btn {
+    max-width: 100%;
+  }
 }
 
 /* ---------------- 报告生成中的占位卡片 ----------------

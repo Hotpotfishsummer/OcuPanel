@@ -190,6 +190,10 @@ curl -X POST http://127.0.0.1:8000/api/generate-report-content/ \
 }
 ```
 
+`img_name` 是分割叠加图在服务端的文件名，前端用 `GET /api/get-report-image/{img_name}`
+取回二进制（需要同一个 Bearer token），渲染成报告顶部的杯盘图示；`img_name` 为空表示
+本次分析没有产出叠加图，只展示文字与 CDR。
+
 `verification.status` 取值与含义：
 
 | status | 含义 | 是否交付 |

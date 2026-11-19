@@ -59,8 +59,44 @@ function ReportPending({ startedAt }) {
   )
 }
 
+/** 报告顶部的杯盘分割图示：绿色是视杯，粉色是视盘边界。 */
+function ReportFigure({ url, cdr, onZoom }) {
+  return (
+    <figure className="report-figure">
+      <button
+        type="button"
+        className="report-figure-btn"
+        onClick={() => onZoom(url)}
+        title="点击查看大图"
+      >
+        <img
+          className="report-figure-img"
+          src={url}
+          alt="眼底影像杯盘分割：绿色描出视杯，粉色描出视盘盘沿"
+        />
+        <span className="report-figure-zoom">查看大图</span>
+      </button>
+      <figcaption className="report-figure-caption">
+        {cdr != null && (
+          <span
+            className="report-figure-cdr"
+            title="面积等效直径比 √(视杯面积/视盘面积)，与临床目测的垂直杯盘比略有差异"
+          >
+            杯盘比 <strong>{Number(cdr).toFixed(2)}</strong>
+            <em className="report-figure-note">面积等效</em>
+          </span>
+        )}
+        <span className="report-figure-legend">
+          <i className="legend-cup" aria-hidden="true" />视杯
+          <i className="legend-disc" aria-hidden="true" />视盘（盘沿）
+        </span>
+      </figcaption>
+    </figure>
+  )
+}
+
 /** 一条消息。meta 里可能带报告相关字段（分割图、证据、校验结果）。 */
-function MessageItem({ m, imageUrls, onDownloadPdf, busy }) {
+function MessageItem({ m, imageUrls, onDownloadPdf, busy, onZoom }) {
   if (m.role === 'user') {
     return (
       <div className="msg msg-user">
@@ -91,10 +127,14 @@ function MessageItem({ m, imageUrls, onDownloadPdf, busy }) {
           )
         ) : (
           <>
+            {meta.kind === 'report' && imgUrl && (
+              <ReportFigure url={imgUrl} cdr={meta.cup_to_disc_ratio} onZoom={onZoom} />
+            )}
             <Markdown text={m.content} />
             {meta.kind === 'report' && (
               <div className="msg-report-meta">
-                {meta.cup_to_disc_ratio != null && (
+                {/* 有图时杯盘比显示在图注里，避免重复 */}
+                {meta.cup_to_disc_ratio != null && !imgUrl && (
                   <span className="chip">杯盘比 {Number(meta.cup_to_disc_ratio).toFixed(2)}</span>
                 )}
                 {/* 只有本会话内生成、且没被拒答的报告才给下载入口：
@@ -108,11 +148,6 @@ function MessageItem({ m, imageUrls, onDownloadPdf, busy }) {
                   >
                     下载 PDF
                   </button>
-                )}
-                {imgUrl && (
-                  <div className="msg-report-image">
-                    <img className="ai-image" src={imgUrl} alt="视盘分割结果" />
-                  </div>
                 )}
               </div>
             )}
@@ -140,6 +175,7 @@ export default function ChatView({
   const listRef = useRef(null)
   const inputRef = useRef(null)
   const pinnedRef = useRef(true)
+  const [zoomUrl, setZoomUrl] = useState(null)
 
   // 报告生成和普通提问都会让 busy=true，按钮文案要能区分，否则都是"思考中…"
   const generatingReport = messages.some((m) => m.pending && m.meta?.pending_report)
@@ -182,6 +218,16 @@ export default function ChatView({
     observer.observe(container)
     return () => observer.disconnect()
   }, [])
+
+  // 大图用 Esc 关掉，符合看图习惯
+  useEffect(() => {
+    if (!zoomUrl) return undefined
+    const onKey = (e) => {
+      if (e.key === 'Escape') setZoomUrl(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [zoomUrl])
 
   const handleScroll = () => {
     const el = listRef.current
@@ -227,6 +273,7 @@ export default function ChatView({
             imageUrls={imageUrls}
             onDownloadPdf={onDownloadPdf}
             busy={busy}
+            onZoom={setZoomUrl}
           />
         ))}
       </div>
@@ -280,6 +327,24 @@ export default function ChatView({
           </div>
         </div>
       </div>
+
+      {zoomUrl && (
+        <div
+          className="image-lightbox"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setZoomUrl(null)}
+        >
+          <img src={zoomUrl} alt="杯盘分割大图" />
+          <button
+            type="button"
+            className="image-lightbox-close"
+            onClick={() => setZoomUrl(null)}
+          >
+            关闭
+          </button>
+        </div>
+      )}
     </div>
   )
 }

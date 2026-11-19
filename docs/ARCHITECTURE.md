@@ -172,6 +172,7 @@ React 18 + Vite，无路由库，靠 `App.jsx` 的视图状态切换：
 
 - `ChatView`：消息流、报告卡片、生成进度（时间驱动，非真实进度）、追问输入；
 - `ReportView` / `VerificationResult` / `EvidenceList`：报告、校验条、证据列表；
+- 报告气泡顶部渲染 `ReportFigure`：杯盘分割叠加图 + CDR 图注，点击开大图（Esc/点击关闭）；
 - `SettingsView`：个人 LLM 配置与用量；
 - 开发模式 5500 端口，`/api` 代理到 8000；生产由 FastAPI 托管 `dist`。
 
