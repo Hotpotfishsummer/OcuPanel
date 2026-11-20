@@ -33,31 +33,38 @@
 ```bash
 git clone https://github.com/Hotpotfishsummer/OcuPanel.git
 cd OcuPanel
-
-python3 -m venv .venv
-source .venv/bin/activate            # Windows: .venv\Scripts\activate
-pip install -r backend/requirements.txt
-
-cp backend/.env.example backend/.env
-# 编辑 backend/.env，至少填 OPENAI_BASE_URL 与 OPENAI_MODEL
-
-cd frontend && npm install && npm run build && cd ..
-
-bash local/start.sh                  # 或直接 python backend/main.py
+bash start.sh                        # 一键：建 venv → 装依赖 → 构建前端 → 启动 → 开浏览器
 ```
 
-打开 <http://127.0.0.1:8000>。
-
-首次启动会下载多语言向量模型 `intfloat/multilingual-e5-small`（约 470 MB）。
-国内网络建议在 `.env` 里加 `HF_ENDPOINT=https://hf-mirror.com`。
-
-其它脚本：
+脚本是幂等的：**缺什么补什么，已经在跑就只做健康检查并打开页面**。
+首次运行会建 `.venv`、装依赖（约 2–5 分钟）、从 `.env.example` 生成 `backend/.env`、
+构建前端，然后后台启动并等到服务真正应答才返回。
 
 ```bash
-bash local/status.sh    # 看进程与 HTTP 健康
-bash local/stop.sh      # 停止
+bash start.sh restart    # 改完配置重启
+bash start.sh --no-open  # 不自动开浏览器
+bash stop.sh             # 停止（先 SIGTERM，10 秒不退才 SIGKILL）
+bash status.sh           # 进程 + HTTP 健康 + 最近日志，未运行返回退出码 1
 tail -f logs/ocupanel.log
 ```
+
+macOS 也可以在 Finder 里双击 `start.command`，效果等同 `bash start.sh`。
+
+打开 <http://127.0.0.1:8000>。**首次生成报告**要下载/加载多语言向量模型
+`intfloat/multilingual-e5-small`（约 470 MB），多等 30–60 秒；国内网络建议在
+`.env` 里加 `HF_ENDPOINT=https://hf-mirror.com`。
+
+脚本会检查的事，出错时直接告诉你怎么办：
+
+| 检查 | 处理 |
+| --- | --- |
+| Python 版本 | 低于 3.11 直接报错退出 |
+| 依赖缺失 | 自动 `pip install -r backend/requirements.txt` |
+| `.env` 不存在 | 从 `.env.example` 复制并 `chmod 600` |
+| 没配 LLM 端点 | 警告：能开页面，生成报告会 409 |
+| 前端源码比产物新 | 自动 `npm run build` |
+| 端口被别的程序占用 | 报占用 PID，不误杀 |
+| 启动 60 秒没应答 | 打最后 20 行日志再退出 |
 
 ---
 
@@ -160,7 +167,11 @@ backend/
 frontend/
   src/components/    # 聊天、报告、校验结果、设置
   vite.config.js     # 5500 + /api 代理
-local/               # start/stop/status 脚本
+start.sh             # 一键启动（自检、装依赖、构建、等到健康）
+stop.sh              # 停止
+status.sh            # 进程 + HTTP 健康
+start.command        # macOS 双击入口 → start.sh
+local/               # 本机运行产物（pid 文件）+ 开机自启安装，不入库
 samples/             # 示例眼底图、病历、样例报告
 ```
 
